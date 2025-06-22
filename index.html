@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>อายุครรภ์จาก EDC + คำแนะนำ</title>
+  <style>
+    body { max-width:600px; margin:auto; font-family:Arial, sans-serif; padding:20px }
+    input, button { font-size:16px; padding:8px; margin:4px 0; width:100% }
+    button { cursor:pointer; }
+    .result { margin-top:20px; background:#f7f7f7; padding:15px; border-radius:5px }
+    .result p { margin:8px 0; }
+  </style>
+</head>
+<body>
+  <h2>อายุครรภ์จากวันกำหนดคลอด (EDC)</h2>
+
+  <label>📅 วันกำหนดคลอด (EDC):</label>
+  <input type="date" id="edc">
+
+  <button onclick="calculate()">คำนวณ</button>
+
+  <div class="result" id="boxResult" style="display:none">
+    <p id="ageResult"></p>
+    <p><strong>🩺 ควรตรวจ:</strong> <span id="check">-</span></p>
+    <p><strong>💡 คำแนะนำ:</strong> <span id="advice">-</span></p>
+    <p><strong>📞 ติดต่อ:</strong> <a id="call" href="#">-</a></p>
+  </div>
+
+  <script>
+    // แปลงปี พ.ศ. > ค.ศ.
+    function parseThaiDate(input) {
+      const [y,m,d] = input.split("-").map(Number);
+      const ry = y > 2500 ? y - 543 : y;
+      return new Date(ry, m - 1, d);
+    }
+
+    // ดึงคำแนะนำจาก Google Sheet (ผ่าน Apps Script Web API)
+    async function getAdvice(weeks) {
+      const resp = await fetch("https://script.google.com/macros/s/URL_OF_YOUR_SCRIPT/exec");
+      const data = await resp.json();
+      return data.find(r => weeks >= r.min && weeks <= r.max);
+    }
+
+    async function calculate() {
+      const edcInput = document.getElementById("edc").value;
+      if (!edcInput) {
+        alert("✋ กรุณากรอกวันกำหนดคลอด (EDC)");
+        return;
+      }
+
+      const dateEDC = parseThaiDate(edcInput);
+      const today = new Date();
+
+      const daysPassed = Math.floor(280 - ((dateEDC - today) / (1000 * 60 * 60 * 24)));
+      let ageText;
+      if (daysPassed < 0) {
+        ageText = `เกินกำหนดคลอดแล้ว ${-daysPassed} วัน`;
+      } else {
+        ageText = `อายุครรภ์: ${Math.floor(daysPassed / 7)} สัปดาห์ ${daysPassed % 7} วัน`;
+      }
+
+      document.getElementById("ageResult").innerText = ageText;
+
+      const weeks = Math.floor(daysPassed / 7);
+      const info = await getAdvice(weeks);
+      if (info) {
+        document.getElementById("check").innerText = info.check;
+        document.getElementById("advice").innerText = info.advice;
+        document.getElementById("call").href = "tel:" + info.phone;
+        document.getElementById("call").innerText = info.phone;
+      } else {
+        document.getElementById("check").innerText = "-";
+        document.getElementById("advice").innerText = "-";
+        document.getElementById("call").href = "#";
+        document.getElementById("call").innerText = "-";
+      }
+
+      document.getElementById("boxResult").style.display = "block";
+    }
+  </script>
+</body>
+</html>
